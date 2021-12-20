@@ -12,10 +12,10 @@ class GitError {
   stderr: string;
   stdout: string;
 
-  constructor(error: Error) {
+  constructor(error: Error, stderr: string = '', stdout: string = '') {
     this.baseerr = error
-    this.stderr = '';
-    this.stdout = '';
+    this.stderr = stderr;
+    this.stdout = stdout;
   }
 }
 
@@ -106,13 +106,8 @@ const backportOnce = async ({
       }
     };
     await exec("git", args, options)
-    .then((result)=>{return {result, stdout, stderr};})
-    .catch(error=>{
-      // err = new GitError(error.message);
-      error.stderr = stderr;
-      error.stdout = stdout;
-      throw error;
-    });
+      .then(result => { return {result, stdout, stderr}; })
+      .catch(error => { throw new GitError(error, stderr, stdout); });
   };
 
   let backportError = null;
@@ -170,11 +165,11 @@ const createDetails = (content: string, title: string) => {
 
   return [
     "<details>",
-    `<summary>${title}</summary>`,
+    `<summary>${title}</summary>\n`,
     "```",
     content,
     "```",
-    "</details>"
+    "</details>\n"
   ].join('\n');
 };
 
@@ -196,7 +191,7 @@ const getFailedBackportCommentBody = ({
     error.baseerr.message,
     "```",
     createDetails(error.stderr, "stderr"),
-    createDetails(error.stderr, "stdout"),
+    createDetails(error.stdout, "stdout"),
     "To backport manually, run these commands in your terminal:",
     "```bash",
     "# Fetch latest updates from GitHub",
@@ -324,7 +319,7 @@ const backport = async ({
       } catch (error: unknown) {
         if (!(error instanceof GitError)) {
           throw new TypeError(
-            `Caught error of unexpected type: ${typeof error}`,
+            `Caught error of unexpected type: ${error}`,
           );
         }
 
