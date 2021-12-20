@@ -7,6 +7,18 @@ import escapeRegExp from "lodash/escapeRegExp";
 
 const labelRegExp = /^backport ([^ ]+)(?: ([^ ]+))?$/;
 
+class GitError {
+  baseerr: Error;
+  stderr: string;
+  stdout: string;
+
+  constructor(error: Error) {
+    this.baseerr = error
+    this.stderr = '';
+    this.stdout = '';
+  }
+}
+
 const getLabelNames = ({
   action,
   label,
@@ -81,7 +93,26 @@ const backportOnce = async ({
   pullRequestNumber: number;
 }) => {
   const git = async (...args: string[]) => {
-    await exec("git", args, { cwd: repo });
+    let stdout = '';
+    let stderr = '';
+    
+    const options = {listeners: {}, cwd: repo};
+    options.listeners = {
+      stdout: (data: Buffer) => {
+        stdout += data.toString();
+      },
+      stderr: (data: Buffer) => {
+        stderr += data.toString();
+      }
+    };
+    await exec("git", args, options)
+    .then((result)=>{return {result, stdout, stderr};})
+    .catch(error=>{
+      // err = new GitError(error.message);
+      error.stderr = stderr;
+      error.stdout = stdout;
+      throw error;
+    });
   };
 
   let backportError = null;
@@ -133,23 +164,39 @@ const backportOnce = async ({
   }
 };
 
+const createDetails = (content: string, title: string) => {
+  if (content.length === 0)
+    return '';
+
+  return [
+    "<details>",
+    `<summary>${title}</summary>`,
+    "```",
+    content,
+    "```",
+    "</details>"
+  ].join('\n');
+};
+
 const getFailedBackportCommentBody = ({
   base,
   commits,
-  errorMessage,
+  error,
   head,
 }: {
   base: string;
   commits: string[];
-  errorMessage: string;
+  error: GitError;
   head: string;
 }) => {
   const worktreePath = `.worktrees/backport-${base}`;
   return [
     `The backport to \`${base}\` failed:`,
     "```",
-    errorMessage,
+    error.baseerr.message,
     "```",
+    createDetails(error.stderr, "stderr"),
+    createDetails(error.stderr, "stdout"),
     "To backport manually, run these commands in your terminal:",
     "```bash",
     "# Fetch latest updates from GitHub",
@@ -275,18 +322,18 @@ const backport = async ({
           pullRequestNumber
         });
       } catch (error: unknown) {
-        if (!(error instanceof Error)) {
+        if (!(error instanceof GitError)) {
           throw new TypeError(
             `Caught error of unexpected type: ${typeof error}`,
           );
         }
 
-        logError(error);
+        logError(error.baseerr);
         await github.issues.createComment({
           body: getFailedBackportCommentBody({
             base,
             commits,
-            errorMessage: error.message,
+            error,
             head,
           }),
           issue_number: pullRequestNumber,
