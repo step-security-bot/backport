@@ -336,7 +336,7 @@ const backport = async ({
           repo,
         });
         await github.issues.addLabels({
-          "backport failed",
+          labels: ["backport failed"],
           owner,
           repo,
           issue_number: pullRequestNumber
