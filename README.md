@@ -26,5 +26,5 @@ Following inputs can be used as `step.with` keys
 | Name               | Type    | Description                       |
 |--------------------|---------|-----------------------------------|
 | `add_labels`       | String  | Comma separated list of labels to add to the backport PR. |
-| `github_token`     | String  | Token for the GitHub API. Set this to a personal access token (PAT) if you want github workflows to run on the opened PR. |
+| `github_token`     | String  | Token for the GitHub API. Set this to a personal access token (PAT) of a user which is collaborator with write permissions on the repository to make workflows run on backport pull requests. |
 | `title_template`   | String  | Template for the title of the opened PR. E.g. `[Backport {{base}}] {{originalTitle}}` |
